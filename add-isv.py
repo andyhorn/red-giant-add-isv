@@ -1,3 +1,4 @@
+from __future__ import print_function
 import argparse
 import zipfile
 import os
@@ -61,11 +62,12 @@ def process_zip_files():
     try:
         # Loop through the list of .zip files
         for zip_file in zip_files:
+            zip_path = os.path.join(ARGS.dir, zip_file)
             tmp_zip = os.path.join(tempdir, "tmp.zip") # Make a .zip file in the temp directory
             print("Processing file %s" % zip_file)
             # Open the .zip file and the temporary .zip file
             with zipfile.ZipFile(tmp_zip, mode="w") as new_zip:
-                with zipfile.ZipFile(zip_file, mode="r") as old_zip:
+                with zipfile.ZipFile(zip_path, mode="r") as old_zip:
                     for item in old_zip.filelist:
                         # Search for license files in the "server" folder
                         # If this license file is not a server license file, simply copy the data
@@ -86,7 +88,7 @@ def process_zip_files():
                             with open(tmp_file, "r") as file:
                                 data = file.read()              # Read the file data
                                 new_zip.writestr(item, data)    # Write the data to the new (temp) .zip file
-            shutil.move(tmp_zip, zip_file) # Move the temporary zip file over the top of the existing file
+            shutil.move(tmp_zip, zip_path) # Move the temporary zip file over the top of the existing file
     finally:
         print("Removing temp directory")
         shutil.rmtree(tempdir) # Remove the temporary directory
