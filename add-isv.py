@@ -17,8 +17,9 @@ def get_args():
     # Add an optional flag for a different output directory
     parser.add_argument("-o",
                         "--out",
-                        help="the output directory for the modified file(s)",
+                        help="the output directory for the modified file(s), default is overwriting current files",
                         action="store",
+                        dest="out",
                         required=False,
                         default=None)
     # Add a mutually exclusive group for .lic files or .zip files
