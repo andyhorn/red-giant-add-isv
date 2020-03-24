@@ -7,28 +7,54 @@ import tempfile
 import shutil
 
 # The line in the .lic file to search for and to add the ISV port value to
-ISV_LINE = "ISV redgiant\n"
+ISV_LINE = "ISV redgiant"
 
 
 # Get the command-line arguments
 def get_args():
     # Set up the argument parser
     parser = argparse.ArgumentParser()
+    # Add an optional flag for a different output directory
+    parser.add_argument("-o",
+                        "--out",
+                        help="the output directory for the modified file(s)",
+                        action="store",
+                        required=False,
+                        default=None)
     # Add a mutually exclusive group for .lic files or .zip files
     file_group = parser.add_mutually_exclusive_group()
-    file_group.add_argument("-l", "--lic", help="directly modify .lic files", action="store_const", const="lic", dest="type")
-    file_group.add_argument("-z", "--zip", help="modify .lic files within .zip files", action="store_const", const="zip", dest="type")
+    file_group.add_argument("-l",
+                            "--lic",
+                            help="directly modify .lic files",
+                            action="store_const",
+                            const="lic",
+                            dest="type")
+    file_group.add_argument("-z",
+                            "--zip",
+                            help="modify .lic files within .zip files",
+                            action="store_const",
+                            const="zip",
+                            dest="type")
     # Add a group for the required arguments: Directory and Port
     required_group = parser.add_argument_group("Required arguments")
-    required_group.add_argument("-d", "--dir", help="the directory containing the licenses", action="store", dest="dir", required=True)
-    required_group.add_argument("-p", "--port", help="the isv port to add to each file", action="store", required=True)
+    required_group.add_argument("-d",
+                                "--dir",
+                                help="the directory containing the licenses",
+                                action="store",
+                                dest="dir",
+                                required=True)
+    required_group.add_argument("-p",
+                                "--port",
+                                help="the isv port to add to each file",
+                                action="store",
+                                required=True)
     # Return the parsed arguments
     return parser.parse_args()
 
 
 # Collect the desired files in the given directory
 def get_files(endswith):
-    # Get the full filepath for the given directory
+    # Get the full file-path for the given directory
     file_path = os.path.realpath(ARGS.dir)
     # Get a list of files in that directory
     all_files = os.listdir(file_path)
@@ -44,7 +70,7 @@ def process_single_file(file):
     added = False # Set the flag
     # Loop through the lines of the license file
     for line in fileinput.input(file, inplace=True):
-        if line == ISV_LINE:
+        if line == ISV_LINE + "\n" or line == ISV_LINE + " \n":
             added = True # Trigger the flag
             line = "ISV redgiant port=%s\n" % ARGS.port # Add the port number
         print(line, end="") # Print the line (write in the file)
@@ -88,7 +114,11 @@ def process_zip_files():
                             with open(tmp_file, "r") as file:
                                 data = file.read()              # Read the file data
                                 new_zip.writestr(item, data)    # Write the data to the new (temp) .zip file
-            shutil.move(tmp_zip, zip_path) # Move the temporary zip file over the top of the existing file
+            if ARGS.out is not None:
+                new_path = os.path.join(ARGS.out, zip_file)
+                shutil.move(tmp_zip, new_path)
+            else:
+                shutil.move(tmp_zip, zip_path) # Move the temporary zip file over the top of the existing file
     finally:
         print("Removing temp directory")
         shutil.rmtree(tempdir) # Remove the temporary directory
@@ -97,10 +127,16 @@ def process_zip_files():
 
 # Process the .lic files in the given directory
 def process_local_files():
-    print("Processing unzipped files...")
+    print("Processing .lic files...")
     lic_files = get_files(".lic")   # Get the .lic files in the chosen directory
     for lic in lic_files:
-        process_single_file(lic)    # Process each file, adding the ISV port value when necessary
+        if ARGS.out is not None:
+            filename = os.path.basename(lic)
+            new_file = os.path.join(ARGS.out, filename)
+            shutil.copy(lic, new_file)
+            process_single_file(new_file)
+        else:
+            process_single_file(lic)    # Process each file, adding the ISV port value when necessary
     print("Complete!")
 
 
