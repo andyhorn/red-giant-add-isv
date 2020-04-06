@@ -38,12 +38,19 @@ def get_args():
                             dest="type")
     # Add a group for the required arguments: Directory and Port
     required_group = parser.add_argument_group("Required arguments")
-    required_group.add_argument("-d",
+
+    dir_or_file_group = required_group.add_mutually_exclusive_group()
+    dir_or_file_group.add_argument("-f",
+                                   "--file",
+                                   help="the license file to modify",
+                                   action="store",
+                                   dest="file")
+    dir_or_file_group.add_argument("-d",
                                 "--dir",
                                 help="the directory containing the licenses",
                                 action="store",
-                                dest="dir",
-                                required=True)
+                                dest="dir")
+
     required_group.add_argument("-p",
                                 "--port",
                                 help="the isv port to add to each file",
@@ -55,14 +62,18 @@ def get_args():
 
 # Collect the desired files in the given directory
 def get_files(endswith):
-    # Get the full file-path for the given directory
-    file_path = os.path.realpath(ARGS.dir)
-    # Get a list of files in that directory
-    all_files = os.listdir(file_path)
-    print("locating %s files in %s" % (endswith, file_path))
-    # Filter the files for the desired file type
-    wanted_files = filter(lambda x: x.endswith(endswith), all_files)
-    return wanted_files
+    if ARGS.dir is not None:
+        # Get the full file-path for the given directory
+        file_path = os.path.realpath(ARGS.dir)
+        # Get a list of files in that directory
+        all_files = os.listdir(file_path)
+        print("locating %s files in %s" % (endswith, file_path))
+        # Filter the files for the desired file type
+        wanted_files = filter(lambda x: x.endswith(endswith), all_files)
+        return wanted_files
+    elif ARGS.file is not None:
+        return [ARGS.file]
+    return None
 
 
 # Process a license file, adding the ISV port value to the line
