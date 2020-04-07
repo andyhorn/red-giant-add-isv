@@ -9,21 +9,34 @@ import shutil
 # The line in the .lic file to search for and to add the ISV port value to
 ISV_LINE = "ISV redgiant"
 
+PARSER = argparse.ArgumentParser()
+
 
 # Get the command-line arguments
 def get_args():
     # Set up the argument parser
-    parser = argparse.ArgumentParser()
+    # PARSER = argparse.ArgumentParser()
     # Add an optional flag for a different output directory
-    parser.add_argument("-o",
+    PARSER.add_argument("-o",
                         "--out",
-                        help="the output directory for the modified file(s), default is overwriting current files",
+                        help="specify a different output path for the modified file(s); default will overwrite - "
+                             "must be a directory if -d is set, else must use a full filename",
                         action="store",
                         dest="out",
                         required=False,
                         default=None)
-    # Add a mutually exclusive group for .lic files or .zip files
-    file_group = parser.add_mutually_exclusive_group()
+    PARSER.add_argument("-d",
+                        "--dir",
+                        help="modify a directory of files; default is a single file",
+                        action="store_const",
+                        const=True,
+                        dest="dir",
+                        required=False,
+                        default=False)
+    # Add a group for the required arguments: [Directory or File] and Port
+    required_group = PARSER.add_argument_group("Required arguments")
+
+    file_group = required_group.add_mutually_exclusive_group(required=True)
     file_group.add_argument("-l",
                             "--lic",
                             help="directly modify .lic files",
@@ -36,43 +49,34 @@ def get_args():
                             action="store_const",
                             const="zip",
                             dest="type")
-    # Add a group for the required arguments: Directory and Port
-    required_group = parser.add_argument_group("Required arguments")
-
-    dir_or_file_group = required_group.add_mutually_exclusive_group()
-    dir_or_file_group.add_argument("-f",
-                                   "--file",
-                                   help="the license file to modify",
-                                   action="store",
-                                   dest="file")
-    dir_or_file_group.add_argument("-d",
-                                "--dir",
-                                help="the directory containing the licenses",
-                                action="store",
-                                dest="dir")
 
     required_group.add_argument("-p",
                                 "--port",
                                 help="the isv port to add to each file",
                                 action="store",
                                 required=True)
+    required_group.add_argument("path",
+                                nargs=1,
+                                help="the path to the file or directory (if specified) to be modified",
+                                action="store")
     # Return the parsed arguments
-    return parser.parse_args()
+    return PARSER.parse_args()
 
 
 # Collect the desired files in the given directory
 def get_files(endswith):
-    if ARGS.dir is not None:
+    if ARGS.dir:
         # Get the full file-path for the given directory
-        file_path = os.path.realpath(ARGS.dir)
+        file_path = os.path.realpath(ARGS.path)
         # Get a list of files in that directory
         all_files = os.listdir(file_path)
         print("locating %s files in %s" % (endswith, file_path))
         # Filter the files for the desired file type
         wanted_files = filter(lambda x: x.endswith(endswith), all_files)
         return wanted_files
-    elif ARGS.file is not None:
-        return [ARGS.file]
+    elif ARGS.path is not None:
+        files = [ARGS.path]
+        return files
     return None
 
 
@@ -100,7 +104,8 @@ def process_zip_files():
     try:
         # Loop through the list of .zip files
         for zip_file in zip_files:
-            zip_path = os.path.join(ARGS.dir, zip_file)
+            zip_path = os.path.join(ARGS.dir, zip_file) if ARGS.dir is not None else zip_file[0]
+            print(zip_path)
             tmp_zip = os.path.join(tempdir, "tmp.zip") # Make a .zip file in the temp directory
             print("Processing file %s" % zip_file)
             # Open the .zip file and the temporary .zip file
@@ -127,7 +132,7 @@ def process_zip_files():
                                 data = file.read()              # Read the file data
                                 new_zip.writestr(item, data)    # Write the data to the new (temp) .zip file
             if ARGS.out is not None:
-                new_path = os.path.join(ARGS.out, zip_file)
+                new_path = os.path.join(ARGS.out, zip_file) if ARGS.dir else ARGS.out
                 shutil.move(tmp_zip, new_path)
             else:
                 shutil.move(tmp_zip, zip_path) # Move the temporary zip file over the top of the existing file
@@ -143,8 +148,8 @@ def process_local_files():
     lic_files = get_files(".lic")   # Get the .lic files in the chosen directory
     for lic in lic_files:
         if ARGS.out is not None:
-            filename = os.path.basename(lic)
-            new_file = os.path.join(ARGS.out, filename)
+            # filename = os.path.basename(lic)
+            new_file = os.path.join(ARGS.out, os.path.basename(lic)) if ARGS.dir else ARGS.out
             shutil.copy(lic, new_file)
             process_single_file(new_file)
         else:
@@ -155,9 +160,25 @@ def process_local_files():
 # Get the command-line arguments
 ARGS = get_args()
 
-# If the file type is .zip, call the .zip processor
-if ARGS.type == "zip":
-    process_zip_files()
-# Otherwise, call the .lic processor
-else:
+# validate the output parameter
+if ARGS.out is not None:
+    if ARGS.dir:
+        # check that the output path is a directory
+        if not os.path.isdir(ARGS.out):
+            PARSER.error("Output path is not a valid directory; Must be a directory when using -d flag")
+    else:
+        # check that the output path is a valid filename
+        if not ARGS.out.endswith(".lic") or not ARGS.out.endswith(".zip"):
+            PARSER.error("Must use a valid output filename ending in .lic or .zip")
+        # check that the output directory exists
+        dir = os.path.dirname(ARGS.out)
+        if not os.path.exists(dir):
+            PARSER.error("Output directory must exist")
+
+if ARGS.type == "lic":
+    # process .lic files
     process_local_files()
+
+elif ARGS.type == "zip":
+    # process .zip files
+    process_zip_files()
