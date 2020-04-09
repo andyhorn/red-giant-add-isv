@@ -104,7 +104,7 @@ def process_zip_files():
     try:
         # Loop through the list of .zip files
         for zip_file in zip_files:
-            zip_path = os.path.join(ARGS.dir, zip_file) if ARGS.dir is not None else zip_file[0]
+            zip_path = os.path.join(ARGS.dir, zip_file) if ARGS.dir is not False else zip_file[0]
             print(zip_path)
             tmp_zip = os.path.join(tempdir, "tmp.zip") # Make a .zip file in the temp directory
             print("Processing file %s" % zip_file)
